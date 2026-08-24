@@ -2,6 +2,15 @@
 
 import { useState, type ReactNode } from "react";
 
+type Mode = "json" | "css" | "html" | "js";
+
+const SAMPLES: Record<Mode, string> = {
+  json: '{\n  "project": "solo-empire",\n  "ships": ["tools", "stories"],\n  "active": true\n}',
+  css: `/* A small component */\n.card {\n  color: #17211b;\n  padding: 16px 20px;\n  border: 1px solid #17211b;\n}`,
+  html: `<!-- A small document -->\n<article class="note">\n  <h2>Ship the useful thing</h2>\n  <p>Small files travel faster.</p>\n</article>`,
+  js: `// A small function\nfunction greet(name) {\n  const message = "Hello, " + name;\n  return message;\n}`,
+};
+
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -10,86 +19,6 @@ async function copyText(text: string) {
     return false;
   }
 }
-
-function Shell({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-100">
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <header className="mb-8">
-          <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Client-side utility · no server required
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">{subtitle}</p>
-        </header>
-        {children}
-        <footer className="mt-10 border-t border-zinc-200 pt-4 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
-          Data stays in your browser. Part of the Bookchaowalit developer tools portfolio.
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-function Button({
-  children,
-  onClick,
-  variant = "primary",
-  disabled,
-  type = "button",
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-  variant?: "primary" | "secondary" | "ghost";
-  disabled?: boolean;
-  type?: "button" | "submit";
-}) {
-  const base =
-    "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-50";
-  const styles =
-    variant === "primary"
-      ? "bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-      : variant === "secondary"
-        ? "bg-white text-zinc-900 ring-1 ring-zinc-200 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800"
-        : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900";
-  return (
-    <button type={type} disabled={disabled} onClick={onClick} className={`${base} ${styles}`}>
-      {children}
-    </button>
-  );
-}
-
-function Field({
-  label,
-  children,
-  hint,
-}: {
-  label: string;
-  children: ReactNode;
-  hint?: string;
-}) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
-      {children}
-      {hint ? <span className="block text-xs text-zinc-500">{hint}</span> : null}
-    </label>
-  );
-}
-
-const inputClass =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-zinc-400 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100";
-const areaClass = `${inputClass} min-h-[160px] resize-y`;
-
-type Mode = "json" | "css" | "html" | "js";
 
 function minify(mode: Mode, input: string): string {
   if (mode === "json") return JSON.stringify(JSON.parse(input));
@@ -107,15 +36,34 @@ function minify(mode: Mode, input: string): string {
       .replace(/\s{2,}/g, " ")
       .trim();
   }
-  // js: strip // and /* */ comments then collapse space outside strings (simple)
-  let out = input.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-  out = out.replace(/\s+/g, " ").replace(/\s*([{};,=+\-*/%<>!&|?:])\s*/g, "$1").trim();
-  return out;
+  const withoutComments = input.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return withoutComments
+    .replace(/\s+/g, " ")
+    .replace(/\s*([{};,=+\-*/%<>!&|?:])\s*/g, "$1")
+    .trim();
+}
+
+function Action({
+  children,
+  onClick,
+  disabled = false,
+  muted = false,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <button type="button" className={`chamber-action${muted ? " chamber-action-muted" : ""}`} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
 }
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("json");
-  const [input, setInput] = useState('{\n  "a": 1,\n  "b": [2, 3]\n}');
+  const [input, setInput] = useState(SAMPLES.json);
   const [output, setOutput] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -124,48 +72,90 @@ export default function Home() {
     setError("");
     try {
       setOutput(minify(mode, input));
-    } catch (e) {
+    } catch (cause) {
       setOutput("");
-      setError(e instanceof Error ? e.message : "Minify failed");
+      setError(cause instanceof Error ? cause.message : "This input could not be minified.");
     }
   };
 
-  const saved =
-    input.length && output.length ? Math.max(0, Math.round((1 - output.length / input.length) * 100)) : 0;
+  const chooseMode = (nextMode: Mode) => {
+    setMode(nextMode);
+    setInput(SAMPLES[nextMode]);
+    setOutput("");
+    setError("");
+    setCopied(false);
+  };
+
+  const saved = input.length && output.length ? Math.max(0, Math.round((1 - output.length / input.length) * 100)) : 0;
 
   return (
-    <Shell title="Code Minifier" subtitle="Collapse whitespace for snippets. Handy for demos — not a production pipeline.">
-      <div className="mb-4 flex flex-wrap gap-2">
-        {(["json", "css", "html", "js"] as Mode[]).map((m) => (
-          <Button key={m} variant={mode === m ? "primary" : "secondary"} onClick={() => setMode(m)}>
-            {m.toUpperCase()}
-          </Button>
-        ))}
+    <main className="compression-shell">
+      <div className="compression-frame">
+        <header className="chamber-topbar">
+          <a className="brand-lockup" href="https://bookchaowalit.com" aria-label="Bookchaowalit home">
+            <span className="brand-stamp">B/</span>
+            <span>BOOKCHAOWALIT</span>
+          </a>
+          <span className="topbar-note">LOCAL TOOL / 01</span>
+        </header>
+
+        <section className="chamber-intro">
+          <div className="intro-mark" aria-hidden="true">&lt; 0 &gt;</div>
+          <div>
+            <p className="section-label">COMPRESSION CHAMBER</p>
+            <h1>Make it smaller.<br /><em>Keep the shape.</em></h1>
+            <p className="intro-copy">A small, honest bench for stripping whitespace from the code that is ready to travel.</p>
+          </div>
+          <p className="boundary-note">NO UPLOADS<br />NO PIPELINE<br />BROWSER ONLY</p>
+        </section>
+
+        <section className="chamber-tool" aria-label="Code minifier">
+          <div className="tool-rail">
+            <div>
+              <p className="section-label">MATERIAL</p>
+              <p className="rail-copy">Choose the shape of the source.</p>
+            </div>
+            <div className="mode-strip" role="tablist" aria-label="Source type">
+              {(Object.keys(SAMPLES) as Mode[]).map((item) => (
+                <button key={item} type="button" role="tab" aria-selected={mode === item} className={`mode-tab${mode === item ? " mode-tab-active" : ""}`} onClick={() => chooseMode(item)}>
+                  .{item}
+                </button>
+              ))}
+            </div>
+            <Action onClick={run}>Run chamber <span aria-hidden="true">→</span></Action>
+          </div>
+
+          <div className="chamber-grid">
+            <label className="material-panel">
+              <span className="panel-heading"><span>01 / SOURCE</span><span>{input.length} chars</span></span>
+              <textarea aria-label="Source code" className="material-editor" value={input} onChange={(event) => { setInput(event.target.value); setOutput(""); setError(""); }} spellCheck={false} />
+            </label>
+            <div className="material-panel output-panel">
+              <span className="panel-heading"><span>02 / COMPACTED</span><span>{output.length ? `${output.length} chars` : "waiting"}</span></span>
+              {output ? (
+                <textarea aria-label="Minified output" className="material-editor" value={output} readOnly spellCheck={false} />
+              ) : (
+                <div className="output-empty"><span className="empty-seal">&lt; / &gt;</span><p>Run the chamber<br />to see the compacted form.</p></div>
+              )}
+            </div>
+          </div>
+
+          <div className="chamber-status" aria-live="polite">
+            <div className="status-cell"><span className="status-label">SOURCE</span><strong>{input.length.toLocaleString()} B</strong></div>
+            <div className="status-arrow" aria-hidden="true">→</div>
+            <div className="status-cell"><span className="status-label">OUTPUT</span><strong>{output ? `${output.length.toLocaleString()} B` : "—"}</strong></div>
+            <div className="status-cell status-saved"><span className="status-label">SPACE RETURNED</span><strong>{output ? `${saved}%` : "—"}</strong></div>
+            <Action muted disabled={!output} onClick={async () => { if (await copyText(output)) { setCopied(true); setTimeout(() => setCopied(false), 1500); } }}>{copied ? "Copied to clipboard" : "Copy output"}</Action>
+          </div>
+          {error ? <p className="chamber-error" role="alert">Input error: {error}</p> : null}
+        </section>
+
+        <footer className="chamber-footer">
+          <p>THE SMALL PRINT</p>
+          <p>Simple client-side transforms for snippets and demos. This is not a production compiler or security boundary. Your source stays in this browser.</p>
+          <span>BOOK / DEV TOOLS</span>
+        </footer>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label={`Input (${input.length} chars)`}>
-          <textarea className={areaClass} value={input} onChange={(e) => setInput(e.target.value)} />
-        </Field>
-        <Field label={`Output (${output.length} chars)${output ? ` · ~${saved}% smaller` : ""}`}>
-          <textarea className={areaClass} value={output} readOnly />
-        </Field>
-      </div>
-      {error ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
-      <div className="mt-4 flex gap-2">
-        <Button onClick={run}>Minify</Button>
-        <Button
-          variant="secondary"
-          disabled={!output}
-          onClick={async () => {
-            if (await copyText(output)) {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </div>
-    </Shell>
+    </main>
   );
 }
